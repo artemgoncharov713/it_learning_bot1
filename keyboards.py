@@ -69,13 +69,23 @@ def search_results_kb(materials) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def favorites_kb(favorites) -> InlineKeyboardMarkup:
-    """Список избранного: открыть + удалить."""
+def favorites_kb(materials) -> InlineKeyboardMarkup:
+    """Список избранного."""
     builder = InlineKeyboardBuilder()
-    for f in favorites:
-        builder.button(text=f"📄 {f['name']}", callback_data=f"material:{f['id']}")
-        builder.button(text="❌", callback_data=f"fav_del:{f['id']}")
+    for m in materials:
+        builder.button(text=m["name"], callback_data=f"fav_view:{m['id']}")
     builder.button(text="⬅️ В главное меню", callback_data="back_to_menu")
-    # Каждая пара (📄 + ❌) — в отдельном ряду
-    builder.adjust(*[2 for _ in favorites], 1)
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def fav_material_card_kb(material_id: int) -> InlineKeyboardMarkup:
+    """Карточка материала из избранного: удалить + назад."""
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="❌ Удалить из избранного",
+        callback_data=f"fav_del:{material_id}"
+    )
+    builder.button(text="⬅️ К избранному", callback_data="menu_favorites")
+    builder.adjust(1)
     return builder.as_markup()

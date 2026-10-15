@@ -1,4 +1,5 @@
 import sqlite3
+
 from config import DB_PATH
 
 
@@ -8,8 +9,6 @@ def get_connection() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     return conn
 
-
-# ---------- Каталог ----------
 
 def get_subjects():
     with get_connection() as conn:
@@ -29,12 +28,8 @@ def get_topics(subject_id: int):
 def get_materials(topic_id: int):
     with get_connection() as conn:
         return conn.execute(
-            """
-            SELECT id, name, material_type, link, description 
-            FROM materials 
-            WHERE topic_id = ? 
-            ORDER BY name
-            """,
+            """SELECT id, name, material_type, link, description, video_link
+               FROM materials WHERE topic_id = ? ORDER BY name""",
             (topic_id,)
         ).fetchall()
 
@@ -42,35 +37,23 @@ def get_materials(topic_id: int):
 def get_material(material_id: int):
     with get_connection() as conn:
         return conn.execute(
-            """
-            SELECT id, name, material_type, link, description 
-            FROM materials 
-            WHERE id = ?
-            """,
+            """SELECT id, name, material_type, link, description, video_link
+               FROM materials WHERE id = ?""",
             (material_id,)
         ).fetchone()
 
-
-# ---------- Поиск ----------
 
 def search_materials(query: str):
     with get_connection() as conn:
         pattern = f"%{query}%"
         return conn.execute(
-            """
-            SELECT id, name, material_type, link, description 
-            FROM materials 
-            WHERE name LIKE ? 
-            ORDER BY name
-            """,
+            """SELECT id, name, material_type, link, description, video_link
+               FROM materials WHERE name LIKE ? ORDER BY name""",
             (pattern,)
         ).fetchall()
 
 
-# ---------- Избранное ----------
-
 def add_to_favorites(telegram_id: int, material_id: int) -> bool:
-    """True — добавлено, False — уже было."""
     with get_connection() as conn:
         try:
             conn.execute(
@@ -86,13 +69,11 @@ def add_to_favorites(telegram_id: int, material_id: int) -> bool:
 def get_favorites(telegram_id: int):
     with get_connection() as conn:
         return conn.execute(
-            """
-            SELECT m.id, m.name, m.material_type, m.link, m.description 
-            FROM favorites f 
-            JOIN materials m ON m.id = f.material_id 
-            WHERE f.telegram_id = ? 
-            ORDER BY f.id DESC
-            """,
+            """SELECT m.id, m.name, m.material_type, m.link, m.description, m.video_link
+               FROM favorites f
+               JOIN materials m ON m.id = f.material_id
+               WHERE f.telegram_id = ?
+               ORDER BY f.id DESC""",
             (telegram_id,)
         ).fetchall()
 

@@ -22,10 +22,14 @@ from keyboards import (
     material_card_kb,
     search_results_kb,
     favorites_kb,
+    fav_material_card_kb,
 )
 
 
 router = Router()
+
+# Хранилище ожидающих поиска
+search_waiting = set()
 
 
 # ---------- Команды ----------
@@ -67,7 +71,7 @@ async def back_to_menu(callback: CallbackQuery):
     await callback.answer()
 
 
-# ---------- Каталог: список дисциплин ----------
+# ---------- Учебные материалы: список дисциплин ----------
 
 @router.callback_query(F.data == "menu_materials")
 async def menu_materials(callback: CallbackQuery):
@@ -166,7 +170,11 @@ async def show_material_card(callback: CallbackQuery):
     )
     if material["description"]:
         text += f"<b>Описание:</b> {material['description']}\n"
+
     text += f"\n🔗 <a href=\"{material['link']}\">Открыть материал</a>"
+
+    if material["video_link"]:
+        text += f"\n📺 <a href=\"{material['video_link']}\">Видеоурок в канале</a>"
 
     await callback.message.edit_text(
         text,
@@ -182,37 +190,71 @@ async def show_material_card(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("fav_add:"))
 async def fav_add(callback: CallbackQuery):
     material_id = int(callback.data.split(":")[1])
-    user_id = callback.from_user.id
+    added = add_to_favorites(callback.from_user.id, material_id)
 
-    added = add_to_favorites(user_id, material_id)
     if added:
         await callback.answer("⭐ Добавлено в избранное")
     else:
         await callback.answer("Уже в избранном")
 
 
-# ---------- Избранное: просмотр ----------
+# ---------- Избранное: список ----------
 
 @router.callback_query(F.data == "menu_favorites")
 async def menu_favorites(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    favorites = get_favorites(user_id)
+    favorites = get_favorites(callback.from_user.id)
 
     if not favorites:
         await callback.message.edit_text(
-            "⭐ Избранное пусто.\n\n"
-            "Открой любой материал и нажми «⭐ В избранное», "
-            "чтобы добавить его сюда.",
-            reply_markup=back_to_menu_kb()
+            "⭐ <b>Избранное</b>\n\n"
+            "Здесь пока пусто. Добавляй материалы звёздочкой ⭐ "
+            "из карточки материала.",
+            reply_markup=back_to_menu_kb(),
+            parse_mode="HTML"
         )
         await callback.answer()
         return
 
     await callback.message.edit_text(
-        "⭐ Твоё избранное:\n\n"
-        "Нажми на название, чтобы открыть материал. "
-        "Или ❌, чтобы удалить из избранного.",
-        reply_markup=favorites_kb(favorites)
+        f"⭐ <b>Избранное</b>\n\nСохранено материалов: {len(favorites)}",
+        reply_markup=favorites_kb(favorites),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+# ---------- Избранное: просмотр материала ----------
+
+@router.callback_query(F.data.startswith("fav_view:"))
+async def fav_view(callback: CallbackQuery):
+    material_id = int(callback.data.split(":")[1])
+    material = get_material(material_id)
+
+    if not material:
+        await callback.message.edit_text(
+            "❌ Материал не найден.",
+            reply_markup=back_to_menu_kb()
+        )
+        await callback.answer()
+        return
+
+    text = (
+        f"⭐ <b>{material['name']}</b>\n\n"
+        f"<b>Тип:</b> {material['material_type']}\n"
+    )
+    if material["description"]:
+        text += f"<b>Описание:</b> {material['description']}\n"
+
+    text += f"\n🔗 <a href=\"{material['link']}\">Открыть материал</a>"
+
+    if material["video_link"]:
+        text += f"\n📺 <a href=\"{material['video_link']}\">Видеоурок в канале</a>"
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=fav_material_card_kb(material_id),
+        parse_mode="HTML",
+        disable_web_page_preview=True
     )
     await callback.answer()
 
@@ -222,40 +264,73 @@ async def menu_favorites(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("fav_del:"))
 async def fav_del(callback: CallbackQuery):
     material_id = int(callback.data.split(":")[1])
-    user_id = callback.from_user.id
+    removed = remove_from_favorites(callback.from_user.id, material_id)
 
-    removed = remove_from_favorites(user_id, material_id)
     if removed:
-        await callback.answer("❌ Удалено из избранного")
+        await callback.answer("Удалено из избранного")
     else:
         await callback.answer("Не найдено в избранном")
 
-    favorites = get_favorites(user_id)
+    favorites = get_favorites(callback.from_user.id)
+
     if not favorites:
         await callback.message.edit_text(
-            "⭐ Избранное пусто.",
-            reply_markup=back_to_menu_kb()
+            "⭐ <b>Избранное</b>\n\nПусто.",
+            reply_markup=back_to_menu_kb(),
+            parse_mode="HTML"
         )
-    else:
-        await callback.message.edit_text(
-            "⭐ Твоё избранное:",
-            reply_markup=favorites_kb(favorites)
-        )
+        return
+
+    await callback.message.edit_text(
+        f"⭐ <b>Избранное</b>\n\nСохранено материалов: {len(favorites)}",
+        reply_markup=favorites_kb(favorites),
+        parse_mode="HTML"
+    )
 
 
-# ---------- Поиск: запуск ----------
+# ---------- Поиск ----------
 
 @router.callback_query(F.data == "menu_search")
 async def menu_search(callback: CallbackQuery):
+    search_waiting.add(callback.from_user.id)
     await callback.message.edit_text(
-        "🔍 Поиск материалов\n\n"
-        "Напиши название или часть названия материала. "
-        "Например: <i>Python</i>, <i>SQL</i>, <i>поиск</i>.\n\n"
-        "Для отмены вернись в главное меню.",
+        "🔍 <b>Поиск материалов</b>\n\n"
+        "Напиши название (или часть названия) материала.\n\n"
+        "Например: <i>python</i>, <i>SQL</i>, <i>цикл</i>.",
         reply_markup=back_to_menu_kb(),
         parse_mode="HTML"
     )
     await callback.answer()
+
+
+@router.message(F.text & ~F.text.startswith("/"))
+async def handle_search_input(message: Message):
+    user_id = message.from_user.id
+    if user_id not in search_waiting:
+        return
+
+    search_waiting.discard(user_id)
+    query = message.text.strip()
+
+    if len(query) < 2:
+        await message.answer("Слишком короткий запрос. Введи хотя бы 2 символа.")
+        return
+
+    results = search_materials(query)
+
+    if not results:
+        await message.answer(
+            f"❌ По запросу «{query}» ничего не найдено.\n\n"
+            "Попробуй другое слово или открой 📚 Учебные материалы.",
+            reply_markup=back_to_menu_kb()
+        )
+        return
+
+    await message.answer(
+        f"🔍 Найдено материалов: <b>{len(results)}</b>\n\nВыбери материал:",
+        reply_markup=search_results_kb(results),
+        parse_mode="HTML"
+    )
 
 
 # ---------- О боте ----------
@@ -270,36 +345,3 @@ async def menu_about(callback: CallbackQuery):
         reply_markup=back_to_menu_kb()
     )
     await callback.answer()
-
-
-# ---------- Поиск: обработка текстового ввода ----------
-# ВАЖНО: этот обработчик ДОЛЖЕН быть последним.
-# Он ловит любой текст, который не является командой.
-
-@router.message(F.text & ~F.text.startswith("/"))
-async def handle_search(message: Message):
-    query = message.text.strip()
-
-    if len(query) < 2:
-        await message.answer(
-            "Слишком короткий запрос. Введи минимум 2 символа.",
-            reply_markup=back_to_menu_kb()
-        )
-        return
-
-    results = search_materials(query)
-
-    if not results:
-        await message.answer(
-            f"❌ По запросу «{query}» ничего не найдено.\n\n"
-            "Попробуй другое слово или открой каталог.",
-            reply_markup=back_to_menu_kb()
-        )
-        return
-
-    await message.answer(
-        f"🔍 Найдено материалов: <b>{len(results)}</b>\n\n"
-        "Нажми на название, чтобы открыть:",
-        reply_markup=search_results_kb(results),
-        parse_mode="HTML"
-    )
