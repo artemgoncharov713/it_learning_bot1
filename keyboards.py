@@ -3,6 +3,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 def main_menu_kb() -> InlineKeyboardMarkup:
+    """Главное меню."""
     builder = InlineKeyboardBuilder()
     builder.button(text="📚 Учебные материалы", callback_data="menu_materials")
     builder.button(text="🔍 Поиск материалов", callback_data="menu_search")
@@ -13,12 +14,14 @@ def main_menu_kb() -> InlineKeyboardMarkup:
 
 
 def back_to_menu_kb() -> InlineKeyboardMarkup:
+    """Кнопка возврата в главное меню."""
     builder = InlineKeyboardBuilder()
     builder.button(text="⬅️ В главное меню", callback_data="back_to_menu")
     return builder.as_markup()
 
 
 def subjects_kb(subjects) -> InlineKeyboardMarkup:
+    """Список дисциплин."""
     builder = InlineKeyboardBuilder()
     for s in subjects:
         builder.button(text=s["name"], callback_data=f"subject:{s['id']}")
@@ -28,6 +31,7 @@ def subjects_kb(subjects) -> InlineKeyboardMarkup:
 
 
 def topics_kb(topics, subject_id: int) -> InlineKeyboardMarkup:
+    """Список тем внутри дисциплины."""
     builder = InlineKeyboardBuilder()
     for t in topics:
         builder.button(text=t["name"], callback_data=f"topic:{t['id']}")
@@ -47,8 +51,31 @@ def materials_kb(materials, subject_id: int) -> InlineKeyboardMarkup:
 
 
 def material_card_kb(material_id: int, topic_id: int) -> InlineKeyboardMarkup:
+    """Карточка материала: в избранное + назад к материалам."""
     builder = InlineKeyboardBuilder()
     builder.button(text="⭐ В избранное", callback_data=f"fav_add:{material_id}")
     builder.button(text="⬅️ К материалам", callback_data=f"topic:{topic_id}")
     builder.adjust(1)
+    return builder.as_markup()
+
+
+def search_results_kb(materials) -> InlineKeyboardMarkup:
+    """Результаты поиска."""
+    builder = InlineKeyboardBuilder()
+    for m in materials:
+        builder.button(text=m["name"], callback_data=f"material:{m['id']}")
+    builder.button(text="⬅️ В главное меню", callback_data="back_to_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def favorites_kb(favorites) -> InlineKeyboardMarkup:
+    """Список избранного: открыть + удалить."""
+    builder = InlineKeyboardBuilder()
+    for f in favorites:
+        builder.button(text=f"📄 {f['name']}", callback_data=f"material:{f['id']}")
+        builder.button(text="❌", callback_data=f"fav_del:{f['id']}")
+    builder.button(text="⬅️ В главное меню", callback_data="back_to_menu")
+    # Каждая пара (📄 + ❌) — в отдельном ряду
+    builder.adjust(*[2 for _ in favorites], 1)
     return builder.as_markup()
