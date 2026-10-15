@@ -7,6 +7,7 @@ from database import (
     get_topics,
     get_materials,
     get_material,
+    get_connection,
 )
 from keyboards import (
     main_menu_kb,
@@ -39,17 +40,12 @@ async def cmd_help(message: Message):
     await message.answer(
         "Как пользоваться ботом:\n\n"
         "• /start — открыть главное меню\n"
-        "• /help — эта справка\n\n"
-        "Разделы меню:\n"
-        "📚 Учебные материалы — каталог дисциплин и тем\n"
-        "🔍 Поиск материалов — поиск по названию\n"
-        "⭐ Избранное — сохранённые материалы\n"
-        "ℹ️ О боте — информация о проекте",
+        "• /help — эта справка",
         reply_markup=main_menu_kb()
     )
 
 
-# ---------- Навигация ----------
+# ---------- Главное меню ----------
 
 @router.callback_query(F.data == "back_to_menu")
 async def back_to_menu(callback: CallbackQuery):
@@ -60,12 +56,11 @@ async def back_to_menu(callback: CallbackQuery):
     await callback.answer()
 
 
-# ---------- Каталог: список дисциплин ----------
+# ---------- Учебные материалы: список дисциплин ----------
 
 @router.callback_query(F.data == "menu_materials")
 async def menu_materials(callback: CallbackQuery):
     subjects = get_subjects()
-
     if not subjects:
         await callback.message.edit_text(
             "📚 Учебные материалы\n\nПока нет ни одной дисциплины.",
@@ -81,13 +76,12 @@ async def menu_materials(callback: CallbackQuery):
     await callback.answer()
 
 
-# ---------- Каталог: темы внутри дисциплины ----------
+# ---------- Дисциплина → Темы ----------
 
 @router.callback_query(F.data.startswith("subject:"))
 async def show_topics(callback: CallbackQuery):
     subject_id = int(callback.data.split(":")[1])
     topics = get_topics(subject_id)
-
     if not topics:
         await callback.message.edit_text(
             "📚 В этой дисциплине пока нет тем.",
@@ -98,18 +92,17 @@ async def show_topics(callback: CallbackQuery):
 
     await callback.message.edit_text(
         "📖 Выбери тему:",
-        reply_markup=topics_kb(topics)
+        reply_markup=topics_kb(topics, subject_id)
     )
     await callback.answer()
 
 
-# ---------- Каталог: материалы внутри темы ----------
+# ---------- Тема → Материалы ----------
 
 @router.callback_query(F.data.startswith("topic:"))
 async def show_materials(callback: CallbackQuery):
     topic_id = int(callback.data.split(":")[1])
     materials = get_materials(topic_id)
-
     if not materials:
         await callback.message.edit_text(
             "📖 В этой теме пока нет материалов.",
@@ -118,20 +111,27 @@ async def show_materials(callback: CallbackQuery):
         await callback.answer()
         return
 
+    # Узнаём subject_id для кнопки «К темам»
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT subject_id FROM topics WHERE id = ?", (topic_id,)
+    ).fetchone()
+    conn.close()
+    subject_id = row["subject_id"] if row else 0
+
     await callback.message.edit_text(
         "📄 Материалы по теме:",
-        reply_markup=materials_kb(materials, topic_id)
+        reply_markup=materials_kb(materials, subject_id)
     )
     await callback.answer()
 
 
-# ---------- Каталог: карточка материала ----------
+# ---------- Карточка материала ----------
 
 @router.callback_query(F.data.startswith("material:"))
 async def show_material_card(callback: CallbackQuery):
     material_id = int(callback.data.split(":")[1])
     material = get_material(material_id)
-
     if not material:
         await callback.message.edit_text(
             "❌ Материал не найден.",
@@ -140,22 +140,21 @@ async def show_material_card(callback: CallbackQuery):
         await callback.answer()
         return
 
-    text = (
-        f"📄 <b>{material['name']}</b>\n\n"
-        f"<b>Тип:</b> {material['material_type']}\n"
-    )
-    if material["description"]:
-        text += f"<b>Описание:</b> {material['description']}\n"
-
-    text += f"\n🔗 <a href=\"{material['link']}\">Открыть материал</a>"
-
-    from database import get_connection
+    # topic_id материала — для кнопки «К материалам»
     conn = get_connection()
     row = conn.execute(
         "SELECT topic_id FROM materials WHERE id = ?", (material_id,)
     ).fetchone()
     conn.close()
     topic_id = row["topic_id"] if row else 0
+
+    text = (
+        f"📄 <b>{material['name']}</b>\n\n"
+        f"<b>Тип:</b> {material['material_type']}\n"
+    )
+    if material["description"]:
+        text += f"<b>Описание:</b> {material['description']}\n"
+    text += f"\n🔗 <a href=\"{material['link']}\">Открыть материал</a>"
 
     await callback.message.edit_text(
         text,
@@ -166,7 +165,7 @@ async def show_material_card(callback: CallbackQuery):
     await callback.answer()
 
 
-# ---------- Заглушка: избранное (полноценно на этапе 5) ----------
+# ---------- Заглушка для избранного ----------
 
 @router.callback_query(F.data.startswith("fav_add:"))
 async def fav_add(callback: CallbackQuery):
@@ -176,29 +175,7 @@ async def fav_add(callback: CallbackQuery):
     )
 
 
-# ---------- Заглушки для остальных разделов меню ----------
-
-@router.callback_query(F.data == "menu_search")
-async def menu_search(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "🔍 Поиск материалов\n\n"
-        "Здесь можно будет искать материалы по названию.\n"
-        "(Появится на этапе 5.)",
-        reply_markup=back_to_menu_kb()
-    )
-    await callback.answer()
-
-
-@router.callback_query(F.data == "menu_favorites")
-async def menu_favorites(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "⭐ Избранное\n\n"
-        "Здесь будут материалы, которые ты сохранил.\n"
-        "(Появится на этапе 5.)",
-        reply_markup=back_to_menu_kb()
-    )
-    await callback.answer()
-
+# ---------- О боте ----------
 
 @router.callback_query(F.data == "menu_about")
 async def menu_about(callback: CallbackQuery):
