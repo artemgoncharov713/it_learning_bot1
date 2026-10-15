@@ -6,11 +6,14 @@ from aiogram.types import BotCommand
 
 from config import BOT_TOKEN
 from handlers import router
+from admin import admin_router
+
 
 logging.basicConfig(level=logging.INFO)
 
 dp = Dispatcher()
 dp.include_router(router)
+dp.include_router(admin_router)
 
 
 async def set_commands(bot: Bot):
