@@ -40,6 +40,7 @@ class AddMaterial(StatesGroup):
     link = State()
     description = State()
     video_link = State()
+    file = State()
 
 
 class EditMaterial(StatesGroup):

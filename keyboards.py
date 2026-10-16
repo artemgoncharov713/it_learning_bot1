@@ -3,11 +3,10 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 # ============================================================
-# ОСНОВНЫЕ КЛАВИАТУРЫ
+# ОСНОВНЫЕ
 # ============================================================
 
 def main_menu_kb(is_admin: bool = False) -> InlineKeyboardMarkup:
-    """Главное меню. Если админ — добавляем кнопку админ-панели."""
     builder = InlineKeyboardBuilder()
     builder.button(text="📚 Учебные материалы", callback_data="menu_materials")
     builder.button(text="🔍 Поиск материалов", callback_data="menu_search")
@@ -92,11 +91,10 @@ def fav_material_card_kb(material_id: int) -> InlineKeyboardMarkup:
 
 
 # ============================================================
-# АДМИН-ПАНЕЛЬ
+# АДМИНКА
 # ============================================================
 
 def admin_menu_kb() -> InlineKeyboardMarkup:
-    """Главное меню админ-панели."""
     builder = InlineKeyboardBuilder()
     builder.button(text="📚 Дисциплины", callback_data="admin_subjects")
     builder.button(text="📖 Темы", callback_data="admin_topics")
@@ -107,7 +105,6 @@ def admin_menu_kb() -> InlineKeyboardMarkup:
 
 
 def admin_subjects_kb() -> InlineKeyboardMarkup:
-    """Меню раздела «Дисциплины»."""
     builder = InlineKeyboardBuilder()
     builder.button(text="➕ Добавить", callback_data="admin_add_subject")
     builder.button(text="✏️ Изменить", callback_data="admin_edit_subject")
@@ -118,7 +115,6 @@ def admin_subjects_kb() -> InlineKeyboardMarkup:
 
 
 def admin_topics_kb() -> InlineKeyboardMarkup:
-    """Меню раздела «Темы»."""
     builder = InlineKeyboardBuilder()
     builder.button(text="➕ Добавить", callback_data="admin_add_topic")
     builder.button(text="✏️ Изменить", callback_data="admin_edit_topic")
@@ -129,7 +125,6 @@ def admin_topics_kb() -> InlineKeyboardMarkup:
 
 
 def admin_materials_kb() -> InlineKeyboardMarkup:
-    """Меню раздела «Материалы»."""
     builder = InlineKeyboardBuilder()
     builder.button(text="➕ Добавить", callback_data="admin_add_material")
     builder.button(text="✏️ Изменить", callback_data="admin_edit_material")
@@ -140,12 +135,6 @@ def admin_materials_kb() -> InlineKeyboardMarkup:
 
 
 def admin_list_kb(items, prefix: str, back_callback: str) -> InlineKeyboardMarkup:
-    """
-    Универсальная клавиатура для выбора элемента из списка.
-    items: список записей с полями id и name.
-    prefix: префикс callback (например, 'admin_edit_subject_sel').
-    back_callback: callback для кнопки «Назад».
-    """
     builder = InlineKeyboardBuilder()
     for item in items:
         builder.button(
@@ -158,14 +147,12 @@ def admin_list_kb(items, prefix: str, back_callback: str) -> InlineKeyboardMarku
 
 
 def cancel_kb(back_callback: str = "admin_menu") -> InlineKeyboardMarkup:
-    """Кнопка отмены действия."""
     builder = InlineKeyboardBuilder()
     builder.button(text="❌ Отмена", callback_data=back_callback)
     return builder.as_markup()
 
 
 def skip_or_cancel_kb(back_callback: str = "admin_menu") -> InlineKeyboardMarkup:
-    """Кнопки «Пропустить» и «Отмена» — для необязательных полей."""
     builder = InlineKeyboardBuilder()
     builder.button(text="⏭ Пропустить", callback_data="admin_skip")
     builder.button(text="❌ Отмена", callback_data=back_callback)
@@ -173,10 +160,43 @@ def skip_or_cancel_kb(back_callback: str = "admin_menu") -> InlineKeyboardMarkup
     return builder.as_markup()
 
 
-def confirm_delete_kb(prefix: str, item_id: int, back_callback: str) -> InlineKeyboardMarkup:
-    """Подтверждение удаления."""
+def confirm_delete_kb(prefix: str, item_id: int,
+                      back_callback: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="🗑 Да, удалить", callback_data=f"{prefix}:{item_id}")
     builder.button(text="❌ Отмена", callback_data=back_callback)
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def material_types_kb(back_callback: str = "admin_materials") -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📖 теория", callback_data="mtype:теория")
+    builder.button(text="💻 примеры кода", callback_data="mtype:примеры кода")
+    builder.button(text="📝 практические задания",
+                   callback_data="mtype:практические задания")
+    builder.button(text="📎 дополнительный материал",
+                   callback_data="mtype:дополнительный материал")
+    builder.button(text="❌ Отмена", callback_data=back_callback)
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def edit_material_fields_kb(material_id: int,
+                            back_callback: str) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📝 Название",
+                   callback_data=f"edit_m_field:name:{material_id}")
+    builder.button(text="🏷 Тип",
+                   callback_data=f"edit_m_field:material_type:{material_id}")
+    builder.button(text="🔗 Ссылка",
+                   callback_data=f"edit_m_field:link:{material_id}")
+    builder.button(text="📄 Описание",
+                   callback_data=f"edit_m_field:description:{material_id}")
+    builder.button(text="📺 Видео-ссылка",
+                   callback_data=f"edit_m_field:video_link:{material_id}")
+    builder.button(text="📎 Файл",
+                   callback_data=f"edit_m_field:file_id:{material_id}")
+    builder.button(text="⬅️ Назад", callback_data=back_callback)
     builder.adjust(1)
     return builder.as_markup()
